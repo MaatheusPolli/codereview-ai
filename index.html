@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeReview AI — Offline Senior Reviewer</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Prism.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 CodeReview AI</h1>
+            <p class="subtitle">Offline Senior Developer powered by Gemini Nano</p>
+        </header>
+
+        <main class="main-content">
+            <div class="editor-section">
+                <div class="toolbar">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="file-input" hidden>
+                        <button type="button" class="btn" id="file-upload-btn">
+                            📁 Upload File
+                        </button>
+                    </div>
+
+                    <select id="language-selector">
+                        <option value="javascript">JavaScript / TypeScript</option>
+                        <option value="pascal">Pascal / Delphi</option>
+                        <option value="sql">SQL</option>
+                        <option value="xml">XML / Config</option>
+                    </select>
+
+                    <button type="button" class="btn btn-primary" id="review-button">
+                        🚀 Review Code
+                    </button>
+                </div>
+
+                <div class="editor-container">
+                    <pre id="highlighting" aria-hidden="true"><code class="language-javascript" id="highlighting-content"></code></pre>
+                    <textarea id="code-editor" spellcheck="false" placeholder="Paste your code here or upload a file..."></textarea>
+                </div>
+            </div>
+
+            <div class="results-section">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="results">Analysis</button>
+                    <button class="tab-btn" data-tab="history">History</button>
+                    <button class="tab-btn" data-tab="settings">Settings</button>
+                </div>
+                
+                <div id="results-tab" class="tab-content active">
+                    <div class="results-header">
+                        <h2>Issues Found</h2>
+                        <button id="export-btn" class="btn" disabled>💾 Export .md</button>
+                    </div>
+                    <div id="results-container">
+                        <div class="empty-state">
+                            <p>No issues found yet. Upload code and click Review.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="history-tab" class="tab-content">
+                    <div class="results-header">
+                        <h2>Analytics & History</h2>
+                    </div>
+                    <div id="analytics-container"></div>
+                    <div id="history-container"></div>
+                </div>
+
+                <div id="settings-tab" class="tab-content">
+                    <div class="results-header">
+                        <h2>Custom Standards</h2>
+                    </div>
+                    <div class="settings-form">
+                        <label for="settings-language">Language:</label>
+                        <select id="settings-language-selector">
+                            <option value="javascript">JavaScript / TypeScript</option>
+                            <option value="pascal">Pascal / Delphi</option>
+                            <option value="sql">SQL</option>
+                            <option value="xml">XML / Config</option>
+                        </select>
+                        <p class="field-info">Edit the company standards for this language (Markdown):</p>
+                        <textarea id="custom-context-editor" placeholder="Enter company rules here..."></textarea>
+                        <button id="save-settings-btn" class="btn btn-primary">💾 Save Rules</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="copyright">
+            Matheus Gasparotto Polli
+        </footer>
+    </div>
+
+    <!-- Prism.js Core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-pascal.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+
+    <script type="module" src="./index.js"></script>
+</body>
+
+</html>
