@@ -3,25 +3,93 @@ export class View {
         this.elements = {
             codeEditor: document.getElementById('code-editor'),
             languageSelector: document.getElementById('language-selector'),
+            senioritySelector: document.getElementById('seniority-selector'),
             reviewButton: document.getElementById('review-button'),
             fileInput: document.getElementById('file-input'),
             fileUploadBtn: document.getElementById('file-upload-btn'),
+            editorContainer: document.querySelector('.editor-container'),
             resultsContainer: document.getElementById('results-container'),
             exportBtn: document.getElementById('export-btn'),
+            exportPdfBtn: document.getElementById('export-pdf-btn'),
+            filtersContainer: document.getElementById('filters-container'),
+            filterPills: document.querySelectorAll('.filter-pill'),
             highlighting: document.getElementById('highlighting'),
             highlightingContent: document.getElementById('highlighting-content'),
+            lineNumbers: document.getElementById('line-numbers'),
+            minimap: document.getElementById('minimap'),
+            minimapContent: document.getElementById('minimap-content'),
             tabBtns: document.querySelectorAll('.tab-btn'),
             tabContents: document.querySelectorAll('.tab-content'),
             analyticsContainer: document.getElementById('analytics-container'),
             historyContainer: document.getElementById('history-container'),
             settingsLanguageSelector: document.getElementById('settings-language-selector'),
             customContextEditor: document.getElementById('custom-context-editor'),
-            saveSettingsBtn: document.getElementById('save-settings-btn')
+            saveSettingsBtn: document.getElementById('save-settings-btn'),
+            themeToggle: document.getElementById('theme-toggle'),
+            resultsLanguageSelector: document.getElementById('results-language-selector')
         };
         this.currentResults = [];
         this._initEditorSync();
         this._initLanguageListener();
         this._initTabs();
+        this._initDragAndDrop();
+        this._initTheme();
+        this._initResultsLanguage();
+    }
+
+    _initResultsLanguage() {
+        const savedLang = localStorage.getItem('resultsLanguage') || 'pt';
+        this.elements.resultsLanguageSelector.value = savedLang;
+
+        this.elements.resultsLanguageSelector.addEventListener('change', (e) => {
+            localStorage.setItem('resultsLanguage', e.target.value);
+        });
+    }
+
+    getResultsLanguage() {
+        return this.elements.resultsLanguageSelector.value;
+    }
+
+    _initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+
+        this.elements.themeToggle.addEventListener('click', () => {
+            const currentTheme = document.body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+    }
+
+    _initDragAndDrop() {
+        const { editorContainer } = this.elements;
+
+        editorContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editorContainer.classList.add('drag-over');
+        });
+
+        editorContainer.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editorContainer.classList.remove('drag-over');
+        });
+
+        editorContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editorContainer.classList.remove('drag-over');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                // Trigger the same callback as file input
+                const event = { target: { files: files } };
+                this._fileChangeCallback?.(event);
+            }
+        });
     }
 
     _initTabs() {
@@ -31,6 +99,42 @@ export class View {
                 this.switchTab(tabName);
             });
         });
+
+        // Initialize Filter Listeners
+        this.elements.filterPills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                this.elements.filterPills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                this._applySeverityFilter(pill.getAttribute('data-severity'));
+            });
+        });
+    }
+
+    _applySeverityFilter(severity) {
+        const cards = this.elements.resultsContainer.querySelectorAll('.issue-card');
+        cards.forEach(card => {
+            if (severity === 'all' || card.classList.contains(severity)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    _updateFilterCounts(issues) {
+        const counts = issues.reduce((acc, curr) => {
+            acc[curr.severity] = (acc[curr.severity] || 0) + 1;
+            acc.all++;
+            return acc;
+        }, { all: 0, critical: 0, medium: 0, low: 0 });
+
+        this.elements.filterPills.forEach(pill => {
+            const sev = pill.getAttribute('data-severity');
+            const countEl = pill.querySelector('.count');
+            if (countEl) countEl.textContent = counts[sev] || 0;
+        });
+
+        this.elements.filtersContainer.style.display = issues.length > 0 ? 'flex' : 'none';
     }
 
     switchTab(tabName) {
@@ -51,6 +155,77 @@ export class View {
         if (tabName === 'settings') {
             this.dispatchEvent('settingsTabOpened');
         }
+    }
+
+    onApplyFix(callback) {
+        window.addEventListener('applyFix', (e) => callback(e.detail));
+    }
+
+    applyCodeFix(issue) {
+        const code = this.elements.codeEditor.value;
+        const lines = code.split('\n');
+        const { line: lineNum, originalLine, suggestion } = issue;
+        
+        let targetIndex = lineNum - 1;
+
+        // 1. Anchor Check: If originalLine is provided, try to find it
+        if (originalLine) {
+            const cleanOriginal = originalLine.split('\n')[0].trim(); // Take first line if AI sends multiple
+            
+            // Check if current line matches
+            if (lines[targetIndex]?.trim() !== cleanOriginal) {
+                // Search nearby first (+/- 20 lines)
+                let found = false;
+                for (let i = Math.max(0, targetIndex - 20); i < Math.min(lines.length, targetIndex + 20); i++) {
+                    if (lines[i].trim().includes(cleanOriginal) || cleanOriginal.includes(lines[i].trim())) {
+                        targetIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+
+                // Global search as last resort
+                if (!found) {
+                    const globalIndex = lines.findIndex(l => l.trim().includes(cleanOriginal));
+                    if (globalIndex !== -1) targetIndex = globalIndex;
+                }
+            }
+        }
+
+        if (targetIndex < 0 || targetIndex >= lines.length) return false;
+
+        // 2. Extract clean code from suggestion
+        let newCodeSnippet = suggestion || "";
+        if (!newCodeSnippet) return false;
+
+        const codeBlockRegex = /```(?:\w+)?\n?([\s\S]*?)```/;
+        const inlineCodeRegex = /`([^`]+)`/;
+        
+        const blockMatch = suggestion.match(codeBlockRegex);
+        const inlineMatch = suggestion.match(inlineCodeRegex);
+        
+        if (blockMatch) {
+            newCodeSnippet = blockMatch[1].trim();
+        } else if (inlineMatch) {
+            newCodeSnippet = inlineMatch[1].trim();
+        }
+
+        // 3. Preserve original indentation
+        const originalTextLine = lines[targetIndex];
+        const indentationMatch = originalTextLine.match(/^(\s*)/);
+        const indentation = indentationMatch ? indentationMatch[0] : "";
+
+        // 4. Apply fix (handling multi-line suggestions)
+        const fixLines = newCodeSnippet.split('\n').map((l, i) => {
+            // Apply indentation to subsequent lines of the fix
+            return (i > 0 && !l.startsWith(' ')) ? indentation + l : l;
+        });
+
+        // Replace one line with N lines
+        lines.splice(targetIndex, 1, ...fixLines);
+
+        this.setCode(lines.join('\n'));
+        return true;
     }
 
     dispatchEvent(name) {
@@ -132,24 +307,61 @@ export class View {
     }
 
     _initEditorSync() {
-        const { codeEditor, highlighting, highlightingContent } = this.elements;
+        const { codeEditor, highlighting, lineNumbers, minimap } = this.elements;
 
         const syncScroll = () => {
             highlighting.scrollTop = codeEditor.scrollTop;
             highlighting.scrollLeft = codeEditor.scrollLeft;
+            lineNumbers.scrollTop = codeEditor.scrollTop;
+            
+            // Minimap scrolls proportionally (slower than main editor)
+            const scrollPercent = codeEditor.scrollTop / (codeEditor.scrollHeight - codeEditor.clientHeight);
+            minimap.scrollTop = scrollPercent * (minimap.scrollHeight - minimap.clientHeight);
         };
 
         codeEditor.addEventListener('input', () => {
             this.updateHighlight();
             syncScroll();
+            this._updateActiveLine();
         });
 
         codeEditor.addEventListener('scroll', syncScroll);
+
+        // Add listeners for cursor movement
+        codeEditor.addEventListener('click', () => this._updateActiveLine());
+        codeEditor.addEventListener('keyup', () => this._updateActiveLine());
+        codeEditor.addEventListener('focus', () => this._updateActiveLine());
+    }
+
+    _updateActiveLine() {
+        const { codeEditor, lineNumbers } = this.elements;
+        const code = codeEditor.value;
+        const cursorPosition = codeEditor.selectionStart;
+        
+        // Calculate current line index
+        const lineIndex = code.substr(0, cursorPosition).split("\n").length - 1;
+
+        // Remove old active class
+        const prevActive = lineNumbers.querySelector('.active-line');
+        if (prevActive) prevActive.classList.remove('active-line');
+
+        // Add new active class
+        const currentLineElement = lineNumbers.children[lineIndex];
+        if (currentLineElement) {
+            currentLineElement.classList.add('active-line');
+        }
     }
 
     updateHighlight() {
-        const { codeEditor, highlightingContent, languageSelector } = this.elements;
+        const { codeEditor, highlightingContent, languageSelector, lineNumbers, minimapContent } = this.elements;
         let code = codeEditor.value;
+
+        // Update Line Numbers
+        const lines = code.split('\n');
+        lineNumbers.innerHTML = lines.map((_, i) => `<div>${i + 1}</div>`).join('');
+
+        // Update Minimap
+        minimapContent.textContent = code;
 
         // Ensure there's a character at the end for proper scrolling/highlighting of empty lines
         if (code[code.length - 1] === "\n") code += " ";
@@ -167,6 +379,14 @@ export class View {
         return this.elements.codeEditor.value;
     }
 
+    getLanguage() {
+        return this.elements.languageSelector.value;
+    }
+
+    getSeniority() {
+        return this.elements.senioritySelector.value;
+    }
+
     setCode(code) {
         this.elements.codeEditor.value = code;
         this.updateHighlight();
@@ -182,6 +402,7 @@ export class View {
     }
 
     onFileChange(callback) {
+        this._fileChangeCallback = callback;
         this.elements.fileInput.addEventListener('change', callback);
     }
 
@@ -211,11 +432,14 @@ export class View {
         this.currentResults = [];
         this.elements.resultsContainer.innerHTML = '';
         this.elements.exportBtn.disabled = true;
+        this.elements.exportPdfBtn.disabled = true;
+        this._updateFilterCounts([]);
     }
 
     renderResults(issues) {
         this.currentResults = issues;
         this.elements.resultsContainer.innerHTML = '';
+        this._updateFilterCounts(issues);
 
         if (issues.length === 0) {
             this.elements.resultsContainer.innerHTML = `
@@ -224,30 +448,49 @@ export class View {
                 </div>
             `;
             this.elements.exportBtn.disabled = true;
+            this.elements.exportPdfBtn.disabled = true;
             return;
         }
 
         issues.forEach(issue => {
             const card = document.createElement('div');
-            card.className = `issue-card ${issue.severity}`;
+            card.className = `issue-card ${issue.severity || 'low'}`;
             
-            // Basic markdown-like parsing for suggestions (bold and code blocks)
-            const parsedSuggestion = this._parseMarkdown(issue.suggestion);
+            // Safe access to properties to avoid 'undefined' on screen
+            const category = issue.category || 'Issue';
+            const severity = issue.severity || 'low';
+            const problem = issue.problem || 'Potential issue detected.';
+            const suggestion = issue.suggestion || '';
+            const line = issue.line || '?';
+
+            const parsedSuggestion = this._parseMarkdown(suggestion);
 
             card.innerHTML = `
                 <div class="issue-header">
-                    <span class="issue-category">${issue.category}</span>
-                    <span class="severity-badge ${issue.severity}">${issue.severity}</span>
+                    <span class="issue-category">${category}</span>
+                    <span class="severity-badge ${severity}">${severity}</span>
                 </div>
-                <div class="issue-problem">${issue.problem}</div>
+                <div class="issue-problem">${problem}</div>
                 <div class="issue-suggestion">
                     <strong>Suggestion:</strong> 
                     <div class="suggestion-content">${parsedSuggestion}</div>
                 </div>
-                <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;">
-                    <span class="issue-line">Line ${issue.line}</span>
+                <div class="issue-footer">
+                    <span class="issue-line">Line ${line}</span>
+                    <button class="btn btn-sm btn-fix">🛠️ Apply Fix</button>
                 </div>
             `;
+
+            const fixBtn = card.querySelector('.btn-fix');
+            fixBtn.addEventListener('click', () => {
+                const success = this.applyCodeFix(issue);
+                if (success) {
+                    // Notify controller that code changed and we need a clean state
+                    const event = new CustomEvent('fixApplied');
+                    window.dispatchEvent(event);
+                }
+            });
+
             this.elements.resultsContainer.appendChild(card);
         });
 
@@ -258,6 +501,11 @@ export class View {
         }
 
         this.elements.exportBtn.disabled = false;
+        this.elements.exportPdfBtn.disabled = false;
+    }
+
+    onExportPdfClick(callback) {
+        this.elements.exportPdfBtn.addEventListener('click', callback);
     }
 
     _parseMarkdown(text) {

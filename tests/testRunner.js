@@ -100,4 +100,5 @@ window.describe = describe;
 window.it = it;
 
 import './unit/complete_suite.test.js';
+import './unit/new_features.test.js';
 document.getElementById('run-btn').addEventListener('click', run);

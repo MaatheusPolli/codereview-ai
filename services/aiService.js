@@ -11,134 +11,128 @@ export class AIService {
 
     async checkRequirements() {
         const errors = [];
-
         // @ts-ignore
         const isChrome = !!window.chrome;
-        if (!isChrome) {
-            errors.push("⚠️ Este recurso só funciona no Google Chrome ou Chrome Canary (versão recente).");
-        }
+        if (!isChrome) errors.push("⚠️ Este recurso só funciona no Google Chrome (versão recente).");
 
         const modelFactory = window.ai?.languageModel || self.LanguageModel;
-
         if (!modelFactory) {
-            errors.push("⚠️ As APIs nativas de IA não estão ativas.");
-            errors.push("Ative as seguintes flags em chrome://flags/:");
-            errors.push("- Prompt API for Gemini Nano");
-            errors.push("- Enabling optimization guide on-device model -> BypassPrefRequirement");
+            errors.push("⚠️ APIs nativas de IA inativas. Ative as flags no chrome://flags/.");
             return errors;
         }
 
         try {
-            const availability = await modelFactory.availability();
-            if (availability === 'no') {
-                errors.push(`⚠️ O seu dispositivo não suporta modelos de linguagem nativos de IA.`);
-            }
-
+            const options = { expectedOutputLanguage: 'en' };
+            const availability = await modelFactory.availability(options);
+            if (availability === 'no') errors.push(`⚠️ Hardware não suporta IA nativa.`);
             if (availability === 'after-download') {
-                errors.push(`⚠️ O modelo de linguagem de IA está sendo baixado. Recarregue a página em alguns instantes.`);
-                await modelFactory.create(); // Trigger download
+                errors.push(`⏳ Baixando modelo de IA. Recarregue em instantes.`);
+                await modelFactory.create(options);
             }
-        } catch (e) {
-             console.warn("Error checking AI availability:", e);
-        }
+        } catch (e) { console.warn("AI Check error:", e); }
 
         return errors.length > 0 ? errors : null;
     }
 
-    async reviewCode(code, language, contextFileContent) {
+    async reviewCode(code, language, contextFileContent, seniority = 'senior', outputLanguage = 'pt') {
         this.abortController?.abort();
         this.abortController = new AbortController();
 
-        const systemPrompt = `You are a senior code reviewer (15+ years exp).
-                            Review code strictly against provided standards.
-                            Respond ONLY with a JSON array of issues. No conversational text.`;
+        const prompts = {
+            junior: `You are a Junior Code Reviewer. Focus on syntax errors and basic naming conventions.`,
+            mid: `You are a Mid-Level Code Reviewer. Focus on performance, DRY principle, and proper error handling.`,
+            senior: `You are a Staff/Senior Code Reviewer. Focus on Scalability, Security, Architecture, and edge cases.`
+        };
+
+        const targetLang = outputLanguage === 'pt' ? 'Portuguese (Brazil)' : 'English';
+        
+        const systemPrompt = `${prompts[seniority] || prompts.senior}
+                            IMPORTANT: You must respond in ${targetLang}. 
+                            Descriptions and suggestions MUST be in ${targetLang}.
+                            IGNORE comments (lines starting with //, --, #, /*).
+                            Respond ONLY with a JSON array of issues. No conversational text.
+                            
+                            Format:
+                            [
+                            {
+                                "line": <number>,
+                                "originalLine": "exact text of line",
+                                "severity": "critical|medium|low",
+                                "category": "Bugs|Security|Performance|Standards|Readability",
+                                "problem": "description",
+                                "suggestion": "code"
+                            }
+                            ]`;
 
         const lines = code.split('\n');
-        const chunkSize = 300;
+        const chunkSize = 250;
         const overlap = 30;
         let allIssues = [];
 
-        for (let i = 0; i < lines.length; i += (chunkSize - overlap)) {
-            const chunk = lines.slice(i, i + chunkSize).join('\n');
-            const issues = await this._reviewChunk(chunk, language, contextFileContent, systemPrompt);
-            allIssues = [...allIssues, ...issues];
-            if (lines.length <= chunkSize) break;
-        }
-
-        return this._deduplicate(allIssues);
-    }
-
-    async _reviewChunk(codeChunk, language, contextFileContent, systemPrompt) {
-        let attempts = 0;
-        const maxAttempts = 2;
-        
-        while (attempts <= maxAttempts) {
-            try {
-                if (this.session) this.session.destroy();
+        try {
+            // Process sequentially for maximum stability
+            for (let i = 0; i < lines.length; i += (chunkSize - overlap)) {
+                const chunk = lines.slice(i, i + chunkSize).join('\n');
+                
+                // Recreate session for each chunk to ensure clean context (Standard stability approach)
                 const modelFactory = window.ai?.languageModel || self.LanguageModel;
-                this.session = await modelFactory.create({ systemPrompt });
-
-                const reviewPrompt = `COMPANY STANDARDS:
-                                    ${contextFileContent}
-
-                                    CODE TO REVIEW (${language}):
-                                    ${codeChunk}
-
-                                    Return a JSON array of issues. Use Markdown in "suggestion".
-                                    [
-                                    {
-                                        "line": <number>,
-                                        "severity": "critical|medium|low",
-                                        "category": "Bugs|Security|Performance|Standards|Readability",
-                                        "problem": "<description>",
-                                        "suggestion": "<markdown fix>"
-                                    }
-                                    ]`;
-
-                const result = await this.session.prompt(reviewPrompt, {
-                    signal: this.abortController.signal
+                const session = await modelFactory.create({ 
+                    systemPrompt,
+                    expectedOutputLanguage: 'en' // ALWAYS 'en' to satisfy Chrome safety, regardless of prompt language
                 });
 
-                const issues = this._extractJSON(result);
-                if (Array.isArray(issues)) return issues;
+                const reviewPrompt = `COMPANY STANDARDS:\n${contextFileContent}\n\nCODE TO REVIEW (${language}):\n${chunk}\n\nReturn JSON:`;
                 
-                throw new Error("Invalid format");
-            } catch (error) {
-                if (error.name === 'AbortError') return [];
-                attempts++;
-                if (attempts > maxAttempts) return [];
-                await new Promise(r => setTimeout(r, 500));
-            } finally {
-                if (this.session) {
-                    this.session.destroy();
-                    this.session = null;
-                }
+                const result = await session.prompt(reviewPrompt, { signal: this.abortController.signal });
+                const issues = this._extractJSON(result);
+                if (Array.isArray(issues)) allIssues.push(...issues);
+                
+                session.destroy();
+                if (lines.length <= chunkSize) break;
             }
+
+            return this._deduplicate(allIssues);
+        } catch (error) {
+            if (error.name === 'AbortError') return [];
+            console.error("AI Review failed:", error);
+            return [];
         }
-        return [];
     }
 
     _extractJSON(text) {
+        if (!text) return null;
+        
+        // Find the array boundaries
+        const start = text.indexOf('[');
+        const end = text.lastIndexOf(']');
+        
+        if (start === -1 || end === -1 || end <= start) return null;
+
+        let jsonStr = text.substring(start, end + 1).trim();
+
         try {
-            return JSON.parse(text);
+            return JSON.parse(jsonStr);
         } catch (e) {
-            const start = text.indexOf('[');
-            const end = text.lastIndexOf(']');
-            if (start !== -1 && end !== -1 && end > start) {
-                try {
-                    return JSON.parse(text.substring(start, end + 1));
-                } catch (inner) {
-                    console.warn("JSON extraction failed:", inner);
-                }
+            try {
+                // Common repairs
+                let repaired = jsonStr
+                    .replace(/[\u0000-\u001F]+/g, " ") // Control chars
+                    .replace(/"`"/g, '"`')             // AI quote error
+                    .replace(/\}\s*\{/g, '}, {')       // Missing commas
+                    .replace(/\n/g, " ");              // Line breaks inside strings
+                
+                return JSON.parse(repaired);
+            } catch (inner) {
+                console.warn("JSON Parse Error:", inner, "Raw text:", text);
+                return null;
             }
         }
-        return null;
     }
 
     _deduplicate(issues) {
         const seen = new Set();
         return issues.filter(issue => {
-            const key = `${issue.line}-${issue.category}-${issue.problem}`;
+            const key = `${issue.line}-${issue.problem}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;

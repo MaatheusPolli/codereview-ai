@@ -50,6 +50,10 @@ export class ReviewController {
             this.handleExport();
         });
 
+        this.view.onExportPdfClick(() => {
+            this.handleExportPdf();
+        });
+
         // Tab events
         this.view.onHistoryTabOpened(async () => {
             const analytics = await this.historyService.getAnalytics();
@@ -73,11 +77,18 @@ export class ReviewController {
             const context = await this.contextService.getContext(lang);
             this.view.setCustomContextValue(context);
         });
+
+        // Quick Fix event
+        window.addEventListener('fixApplied', () => {
+            this.handleReview();
+        });
     }
 
     async handleReview() {
         const code = this.view.getCode();
         const language = this.view.getLanguage();
+        const seniority = this.view.getSeniority();
+        const outputLanguage = this.view.getResultsLanguage();
 
         if (!code.trim()) {
             this.view.showError(["Please provide some code to review."]);
@@ -95,7 +106,7 @@ export class ReviewController {
             const contextContent = await this.contextService.getContext(language);
 
             // 3. Run AI Engine
-            const aiResults = await this.aiService.reviewCode(code, language, contextContent);
+            const aiResults = await this.aiService.reviewCode(code, language, contextContent, seniority, outputLanguage);
 
             // 4. Merge results
             const allIssues = this._mergeResults(regexResults, aiResults);
@@ -153,6 +164,103 @@ export class ReviewController {
         a.download = `review-report-${Date.now()}.md`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    handleExportPdf() {
+        const results = this.view.getResults();
+        if (!results || results.length === 0) return;
+
+        // @ts-ignore
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const fileName = this.currentFileName || 'Pasted Code';
+        const date = new Date().toLocaleString();
+
+        // Title
+        doc.setFontSize(20);
+        doc.setTextColor(40, 44, 52);
+        doc.text('Code Review Report', 14, 22);
+
+        // Meta Info
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`File: ${fileName}`, 14, 30);
+        doc.text(`Date: ${date}`, 14, 35);
+
+        // Summary Statistics
+        const stats = results.reduce((acc, curr) => {
+            acc[curr.severity] = (acc[curr.severity] || 0) + 1;
+            return acc;
+        }, { critical: 0, medium: 0, low: 0 });
+
+        doc.setFontSize(12);
+        doc.setTextColor(0);
+        doc.text('Summary:', 14, 45);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(220, 53, 69); // Red
+        doc.text(`Critical: ${stats.critical}`, 14, 52);
+        doc.setTextColor(255, 193, 7); // Yellow
+        doc.text(`Medium: ${stats.medium}`, 40, 52);
+        doc.setTextColor(40, 167, 69); // Green
+        doc.text(`Low: ${stats.low}`, 65, 52);
+
+        // Table Data
+        const tableBody = results.map(issue => [
+            issue.line.toString(),
+            issue.severity.toUpperCase(),
+            issue.category,
+            issue.problem
+        ]);
+
+        // @ts-ignore
+        doc.autoTable({
+            startY: 60,
+            head: [['Line', 'Severity', 'Category', 'Problem']],
+            body: tableBody,
+            headStyles: { fillStyle: 'f3f4f6', textColor: [31, 41, 55], fontStyle: 'bold' },
+            columnStyles: {
+                1: { fontStyle: 'bold' } // Severity column
+            },
+            didParseCell: function(data) {
+                if (data.column.index === 1 && data.section === 'body') {
+                    const sev = data.cell.raw;
+                    if (sev === 'CRITICAL') data.cell.styles.textColor = [220, 53, 69];
+                    if (sev === 'MEDIUM') data.cell.styles.textColor = [180, 140, 0];
+                    if (sev === 'LOW') data.cell.styles.textColor = [40, 167, 69];
+                }
+            }
+        });
+
+        // Add suggestions as a secondary list if space allows or in new pages
+        let currentY = doc.lastAutoTable.finalY + 15;
+        doc.setFontSize(14);
+        doc.setTextColor(0);
+        doc.text('Detailed Suggestions:', 14, currentY);
+        currentY += 10;
+
+        results.forEach((issue, index) => {
+            if (currentY > 270) {
+                doc.addPage();
+                currentY = 20;
+            }
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.text(`Issue #${index + 1} (Line ${issue.line}):`, 14, currentY);
+            currentY += 5;
+            doc.setFont(undefined, 'normal');
+            
+            // Clean markdown for PDF
+            const cleanSuggestion = issue.suggestion.replace(/```[\s\S]*?```/g, (match) => {
+                return match.replace(/```(?:\w+)?\n?|```/g, '');
+            }).replace(/`([^`]+)`/g, '$1');
+
+            const splitSuggestion = doc.splitTextToSize(cleanSuggestion, 180);
+            doc.text(splitSuggestion, 14, currentY);
+            currentY += (splitSuggestion.length * 5) + 5;
+        });
+
+        doc.save(`review-report-${Date.now()}.pdf`);
     }
 
     toggleLoading(isLoading) {

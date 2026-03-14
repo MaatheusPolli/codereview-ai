@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Hardcoded sensitive info -->
+    <database>
+        <server>localhost</server>
+        <user>admin</user>
+        <password>p@ssword123!</password>
+        <port>3306</port>
+    </database>
+    
+    <api_keys>
+        <google_maps>AIzaSyB-EXAMPLE-KEY-12345</google_maps>
+    </api_keys>
+    
+    <settings>
+        <debug_mode>true</debug_mode>
+        <max_retry>999</max_retry>
+    </settings>
+</configuration>
