@@ -1,58 +1,21 @@
-# 🗺️ Roadmap Estratégico — CodeReview AI
+# 🗺️ Roadmap de Evolução — CodeReview AI
 
-Este documento descreve a visão de evolução do **CodeReview AI**, transformando-o de um MVP de revisão local para uma ferramenta indispensável no fluxo de trabalho de engenharia.
+Este documento descreve as ideias e futuras implementações planejadas para transformar o **CodeReview AI** em uma ferramenta indispensável no fluxo de trabalho de engenharia de software.
 
----
+## 🚀 Próximos Passos (Curto Prazo)
+1.  **Integração com Git Hooks:** Criar um script CLI para rodar revisões automáticas localmente antes de cada `commit`.
+2.  **Suporte a Mais Linguagens:** Expandir os arquivos de contexto e suporte a realce de sintaxe para **Python, Go e Rust**.
+3.  **Configurações de Severidade:** Permitir que o usuário configure o que deve ser considerado "Critical" ou "Low" na aba de Settings.
 
-## 🌅 Horizonte 1 — Quick wins (Concluído ✅)
-*Foco em estabilidade, percepção de valor imediata e qualidade do código.*
+## 🛠️ Expansão de Ecossistema (Médio Prazo)
+1.  **Extensão para Chrome:** Transformar o web-app em uma extensão que revisa código diretamente na interface do **GitHub, GitLab e Bitbucket**.
+2.  **Revisão em Lote (Batch Review):** Permitir o upload de múltiplos arquivos ou uma pasta inteira para uma revisão de projeto completa.
+3.  **Refatoração Automática Avançada:** Melhorar a integração para que o usuário possa aplicar as sugestões de código diretamente no editor com um clique (reintroduzindo o *Apply Fix* de forma mais estável).
 
-| Melhoria | Impacto | Esforço | Status |
-| :--- | :--- | :---: | :--- |
-| **Resiliência no Parsing de JSON** | Evita falhas quando a IA adiciona comentários ou markdown. | P | ✅ 09/03/2026 |
-| **Syntax Highlighting (Prism.js)** | Melhora drasticamente a experiência de leitura do código. | P | ✅ 09/03/2026 |
-| **Language Detection Nativa** | Usa a `Language Detection API` do Chrome para arquivos sem extensão. | M | ✅ 09/03/2026 |
-| **Suporte a Markdown em Sugestões** | Permite que a IA envie blocos de código formatados. | P | ✅ 09/03/2026 |
-| **Testes de Unidade (Services)** | Garante que novas regras de Regex não quebrem funcionalidades. | M | ✅ 09/03/2026 |
-
----
-
-## 🚀 Horizonte 2 — Evolução (Em andamento)
-*Foco em customização, produtividade e integração.*
-
-| Melhoria | Impacto | Esforço | Status |
-| :--- | :--- | :---: | :--- |
-| **Gestão de Regras Customizadas** | UI para usuários adicionarem seus próprios Regex e contexto (.md). | M | ✅ 09/03/2026 |
-| **Histórico com Analytics** | Dashboard mostrando a evolução da qualidade. | M | ✅ 09/03/2026 |
-| **Contextos Especializados** | Refinamento de bibliotecas para Pascal e SQL. | P | ✅ 09/03/2026 |
-| **Revisão de Diretórios (FS API)** | Permite revisar projetos inteiros via File System Access API. | G | ⏳ Adiado (G) |
-| **Integração com Git Hooks** | Script CLI para rodar revisões críticas localmente. | M | ⏳ Próxima sessão |
+## 🌌 Visão de Futuro (Longo Prazo)
+1.  **Integração com VS Code:** Plugin para o VS Code Web e Desktop que utiliza o Gemini Nano local do usuário para revisões em tempo real durante a escrita.
+2.  **Dashboard de Métricas Pro:** Evoluir a aba de Histórico para um dashboard completo que mostra a evolução da qualidade do código do usuário ao longo do tempo.
+3.  **Contexto de Projeto Inteligente:** Permitir que a IA entenda a relação entre diferentes arquivos do projeto para detectar erros de arquitetura cross-file.
 
 ---
-
-## 🔭 Horizonte 3 — Visão
-*Foco em escala, automação inteligente e colaboração.*
-
-| Melhoria | Impacto | Esforço | Status |
-| :--- | :--- | :---: | :--- |
-| **Auto-Fix (Refatoração)** | IA propõe e aplica a correção diretamente no código original. | G | ⏳ Adiado (G) |
-| **Extensão para VS Code** | Integra o motor de revisão diretamente no ambiente. | G | ⏳ Adiado (G) |
-
----
-
-## 📝 Log da Sessão — 09 de Março de 2026
-- **Implementado:** Robustez no `aiService.js` com retry logic (2 tentativas) e extrator de JSON resiliente.
-- **Implementado:** Syntax Highlighting no editor (sincronização textarea/pre) e nas sugestões via Prism.js.
-- **Implementado:** Sistema de Abas (Analysis, History, Settings) para melhor navegação.
-- **Implementado:** Dashboard de Analytics básico mostrando total de revisões e severidade.
-- **Implementado:** Gestão de Contextos Customizados salvos no `localStorage`.
-- **Implementado:** Detecção Heurística de Linguagem + API Nativa do Chrome.
-- **Expandido:** Suíte de testes unitários para cobrir novos casos de detecção e regras sênior de Regex.
-- **Adiado:** Itens de esforço G (Diretórios, Auto-Fix) documentados para horizontes futuros devido à complexidade de segurança e arquitetura.
-
----
-
-## 🛠️ Priorização Imediata (Next Steps)
-1. **Refatoração do `aiService.js`:** Implementar um parser de JSON mais robusto usando `try-catch` e limpeza de strings.
-2. **Setup de Vitest:** Criar a infraestrutura de testes para validar o `RegexService`.
-3. **UI de Edição de Contexto:** Adicionar uma aba "Configurações" para que o usuário não dependa de arquivos estáticos no repositório.
+*Este roadmap é uma lista viva de ideias e pode ser alterado conforme a evolução das APIs nativas de IA do Chrome.*

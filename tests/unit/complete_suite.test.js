@@ -102,6 +102,23 @@ describe('AIService - Gerenciamento de Chunks', () => {
         window.ai.languageModel.create = originalPrompt; // Restaura mock original
     });
 
+    it('Deve extrair JSON de markdown e normalizar chaves complexas', async () => {
+        const originalCreate = window.ai.languageModel.create;
+        window.ai.languageModel.create = async () => ({
+            prompt: async () => '```json\n{\n  "errors": [\n    {\n      "pattern": "Forbidden Patterns",\n      "description": "SQL concat",\n      "line": "10",\n      "priority": "high"\n    }\n  ]\n}\n```',
+            destroy: () => {}
+        });
+
+        const results = await ai.reviewCode('test', 'javascript', 'rules');
+        expect(results.length).toBe(1);
+        expect(results[0].category).toBe('Forbidden Patterns');
+        expect(results[0].problem).toBe('SQL concat');
+        expect(results[0].line).toBe(10);
+        expect(results[0].severity).toBe('critical');
+
+        window.ai.languageModel.create = originalCreate;
+    });
+
     it('Deve tratar erros de JSON malformado da IA graciosamente', async () => {
         const originalCreate = window.ai.languageModel.create;
         window.ai.languageModel.create = async () => ({

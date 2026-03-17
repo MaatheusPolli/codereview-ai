@@ -52,6 +52,11 @@ header {
     align-items: flex-start;
 }
 
+.header-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
 header h1 {
     font-size: 2.5rem;
     font-weight: 800;
@@ -571,6 +576,45 @@ select {
     font-size: 0.9rem;
     color: var(--text-muted);
     margin-bottom: 0.75rem;
+}
+
+.code-comparison {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.comparison-block {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.comparison-label {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    text-transform: uppercase;
+    font-weight: bold;
+    background: var(--toolbar-bg);
+    border-bottom: 1px solid var(--border);
+}
+
+.comparison-code {
+    padding: 0.5rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    background: #1e293b;
+    color: #f1f5f9;
+    white-space: pre-wrap;
+    overflow-x: auto;
+}
+
+.comparison-block.before .comparison-label { color: #ef4444; }
+.comparison-block.after .comparison-label { color: #10b981; }
+
+[data-theme="dark"] .comparison-code {
+    background: #020617;
 }
 
 [data-theme="dark"] .issue-suggestion {

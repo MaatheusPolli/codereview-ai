@@ -3,7 +3,6 @@ export class View {
         this.elements = {
             codeEditor: document.getElementById('code-editor'),
             languageSelector: document.getElementById('language-selector'),
-            senioritySelector: document.getElementById('seniority-selector'),
             reviewButton: document.getElementById('review-button'),
             fileInput: document.getElementById('file-input'),
             fileUploadBtn: document.getElementById('file-upload-btn'),
@@ -25,8 +24,7 @@ export class View {
             settingsLanguageSelector: document.getElementById('settings-language-selector'),
             customContextEditor: document.getElementById('custom-context-editor'),
             saveSettingsBtn: document.getElementById('save-settings-btn'),
-            themeToggle: document.getElementById('theme-toggle'),
-            resultsLanguageSelector: document.getElementById('results-language-selector')
+            themeToggle: document.getElementById('theme-toggle')
         };
         this.currentResults = [];
         this._initEditorSync();
@@ -34,20 +32,6 @@ export class View {
         this._initTabs();
         this._initDragAndDrop();
         this._initTheme();
-        this._initResultsLanguage();
-    }
-
-    _initResultsLanguage() {
-        const savedLang = localStorage.getItem('resultsLanguage') || 'pt';
-        this.elements.resultsLanguageSelector.value = savedLang;
-
-        this.elements.resultsLanguageSelector.addEventListener('change', (e) => {
-            localStorage.setItem('resultsLanguage', e.target.value);
-        });
-    }
-
-    getResultsLanguage() {
-        return this.elements.resultsLanguageSelector.value;
     }
 
     _initTheme() {
@@ -383,10 +367,6 @@ export class View {
         return this.elements.languageSelector.value;
     }
 
-    getSeniority() {
-        return this.elements.senioritySelector.value;
-    }
-
     setCode(code) {
         this.elements.codeEditor.value = code;
         this.updateHighlight();
@@ -464,6 +444,11 @@ export class View {
             const line = issue.line || '?';
 
             const parsedSuggestion = this._parseMarkdown(suggestion);
+            
+            // Extract code snippet from suggestion for the "After" block
+            const codeBlockRegex = /```(?:\w+)?\n?([\s\S]*?)```/;
+            const blockMatch = suggestion.match(codeBlockRegex);
+            const refactoredCode = blockMatch ? blockMatch[1].trim() : "";
 
             card.innerHTML = `
                 <div class="issue-header">
@@ -472,24 +457,30 @@ export class View {
                 </div>
                 <div class="issue-problem">${problem}</div>
                 <div class="issue-suggestion">
-                    <strong>Suggestion:</strong> 
+                    <strong>Review:</strong> 
                     <div class="suggestion-content">${parsedSuggestion}</div>
                 </div>
+                
+                ${(issue.originalLine || refactoredCode) ? `
+                <div class="code-comparison">
+                    ${issue.originalLine ? `
+                    <div class="comparison-block before">
+                        <div class="comparison-label">Original Code</div>
+                        <div class="comparison-code">${this._escapeHTML(issue.originalLine)}</div>
+                    </div>` : ''}
+                    
+                    ${refactoredCode ? `
+                    <div class="comparison-block after">
+                        <div class="comparison-label">Suggested Refactoring</div>
+                        <div class="comparison-code">${this._escapeHTML(refactoredCode)}</div>
+                    </div>` : ''}
+                </div>
+                ` : ''}
+
                 <div class="issue-footer">
-                    <span class="issue-line">Line ${line}</span>
-                    <button class="btn btn-sm btn-fix">🛠️ Apply Fix</button>
+                    <span class="issue-line">${line > 0 ? `Line ${line}` : 'General Issue'}</span>
                 </div>
             `;
-
-            const fixBtn = card.querySelector('.btn-fix');
-            fixBtn.addEventListener('click', () => {
-                const success = this.applyCodeFix(issue);
-                if (success) {
-                    // Notify controller that code changed and we need a clean state
-                    const event = new CustomEvent('fixApplied');
-                    window.dispatchEvent(event);
-                }
-            });
 
             this.elements.resultsContainer.appendChild(card);
         });
@@ -506,6 +497,16 @@ export class View {
 
     onExportPdfClick(callback) {
         this.elements.exportPdfBtn.addEventListener('click', callback);
+    }
+
+    _escapeHTML(text) {
+        if (!text) return "";
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
     _parseMarkdown(text) {

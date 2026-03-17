@@ -18,9 +18,11 @@
                 <h1>🔍 CodeReview AI</h1>
                 <p class="subtitle">Offline Senior Developer powered by Gemini Nano</p>
             </div>
-            <button class="theme-toggle" id="theme-toggle" title="Toggle Dark/Light Mode">
-                🌓
-            </button>
+            <div class="header-controls">
+                <button class="theme-toggle" id="theme-toggle" title="Toggle Dark/Light Mode">
+                    🌓
+                </button>
+            </div>
         </header>
 
         <main class="main-content">
@@ -38,12 +40,6 @@
                         <option value="pascal">Pascal / Delphi</option>
                         <option value="sql">SQL</option>
                         <option value="xml">XML / Config</option>
-                    </select>
-
-                    <select id="seniority-selector">
-                        <option value="junior">Junior Reviewer (Syntax & Basics)</option>
-                        <option value="mid">Mid-Level Reviewer (Performance)</option>
-                        <option value="senior" selected>Senior Reviewer (Architecture)</option>
                     </select>
 
                     <button type="button" class="btn btn-primary" id="review-button">
@@ -100,15 +96,6 @@
                         <h2>Custom Standards</h2>
                     </div>
                     <div class="settings-form">
-                        <label for="results-language-selector">Output Language:</label>
-                        <select id="results-language-selector">
-                            <option value="pt">Português (Brasil)</option>
-                            <option value="en">English</option>
-                        </select>
-                        <p class="field-info">The language used by the AI for descriptions and suggestions.</p>
-
-                        <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border);">
-
                         <label for="settings-language">Company Standards:</label>
                         <select id="settings-language-selector">
                             <option value="javascript">JavaScript / TypeScript</option>

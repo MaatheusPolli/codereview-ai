@@ -87,8 +87,6 @@ export class ReviewController {
     async handleReview() {
         const code = this.view.getCode();
         const language = this.view.getLanguage();
-        const seniority = this.view.getSeniority();
-        const outputLanguage = this.view.getResultsLanguage();
 
         if (!code.trim()) {
             this.view.showError(["Please provide some code to review."]);
@@ -106,7 +104,7 @@ export class ReviewController {
             const contextContent = await this.contextService.getContext(language);
 
             // 3. Run AI Engine
-            const aiResults = await this.aiService.reviewCode(code, language, contextContent, seniority, outputLanguage);
+            const aiResults = await this.aiService.reviewCode(code, language, contextContent);
 
             // 4. Merge results
             const allIssues = this._mergeResults(regexResults, aiResults);
